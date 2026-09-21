@@ -3,14 +3,10 @@
    ============================================================ */
 
 const API_BASE = (function() {
-  // When deployed, __PORT_5000__ is rewritten to a proxy path like "port/5000"
-  // We need to construct the full URL from the page's location
   var raw = "__PORT_5000__";
   if (raw.startsWith("__")) {
-    // Not rewritten — running locally
     return "http://localhost:5000";
   }
-  // Rewritten to a relative path like "port/5000" — make it absolute from proxy root
   var path = window.location.pathname;
   var proxyBase = path.split("/web/")[0];
   return window.location.origin + proxyBase + "/" + raw;
@@ -19,6 +15,7 @@ const API_BASE = (function() {
 // --- State ---
 let currentJobId = null;
 let pollInterval = null;
+let isDemoMode = false;
 
 // --- Theme ---
 (function() {
@@ -54,30 +51,63 @@ fileInput.addEventListener('change', (e) => {
 function handleFile(file) {
   const formData = new FormData();
   formData.append('file', file);
-  formData.append('sample', 'true'); // Use sample transcript for demo
-  
+  formData.append('sample', 'true');
   startJob(formData);
 }
 
 // --- Demo Button ---
 document.getElementById('demoBtn').addEventListener('click', () => {
+  if (typeof DEMO_DATA === 'undefined') {
+    alert('Demo data not loaded. Please refresh the page.');
+    return;
+  }
+  
+  isDemoMode = true;
   document.getElementById('demoBtn').disabled = true;
   document.getElementById('demoBtn').innerHTML = '<span class="status-dot"></span> Running demo...';
   
-  fetch(`${API_BASE}/api/demo`, { method: 'POST' })
-    .then(r => r.json())
-    .then(data => {
-      showPipeline();
-      startPolling(data.job_id);
-    })
-    .catch(err => {
-      console.error(err);
-      document.getElementById('demoBtn').disabled = false;
-      document.getElementById('demoBtn').innerHTML = 'Run Demo — Retry';
-    });
+  showPipeline();
+  runDemoPipeline();
 });
 
+function runDemoPipeline() {
+  // Animate pipeline stages client-side
+  const stages = DEMO_DATA.stages || [];
+  let stageIdx = 0;
+  
+  function nextStage() {
+    if (stageIdx >= stages.length) {
+      // All stages done — render results
+      setTimeout(() => {
+        updateStatus('Complete');
+        document.getElementById('statusBadge').classList.add('complete');
+        renderResults(DEMO_DATA, true);
+      }, 500);
+      return;
+    }
+    
+    // Skip duplicate "running" entries (each stage has a running + complete entry)
+    const stage = stages[stageIdx];
+    if (stage.status === 'running') {
+      updateStage(stage.name, 'running', '');
+      stageIdx++;
+      setTimeout(nextStage, 600);
+    } else if (stage.status === 'complete') {
+      updateStage(stage.name, 'complete', stage.detail);
+      stageIdx++;
+      setTimeout(nextStage, 800);
+    } else {
+      stageIdx++;
+      setTimeout(nextStage, 100);
+    }
+  }
+  
+  nextStage();
+}
+
+// --- Start Job (real upload) ---
 function startJob(formData) {
+  isDemoMode = false;
   document.getElementById('heroSection').style.display = 'none';
   showPipeline();
   
@@ -88,7 +118,7 @@ function startJob(formData) {
     })
     .catch(err => {
       console.error(err);
-      alert('Upload failed. Try the demo instead.');
+      alert('Upload failed. The backend server may not be running. Try the demo instead.');
       location.reload();
     });
 }
@@ -130,7 +160,7 @@ function updateStage(stageName, status, detail) {
   }
 }
 
-// --- Polling ---
+// --- Polling (for real uploads) ---
 function startPolling(jobId) {
   currentJobId = jobId;
   
@@ -143,14 +173,14 @@ function startPolling(jobId) {
         if (data.status === 'complete') {
           clearInterval(pollInterval);
           updateStatus('Complete');
-          renderResults(data.result);
+          document.getElementById('statusBadge').classList.add('complete');
+          renderResults(data.result, false);
         } else if (data.status === 'error') {
           clearInterval(pollInterval);
           updateStatus('Error');
           alert('Pipeline error: ' + (data.error || 'Unknown'));
         } else {
           updateStatus('Processing...');
-          // Update pipeline stages
           if (data.result && data.result.stages) {
             for (const stage of data.result.stages) {
               updateStage(stage.name, stage.status, stage.detail);
@@ -163,7 +193,7 @@ function startPolling(jobId) {
 }
 
 // --- Results Rendering ---
-function renderResults(result) {
+function renderResults(result, demo) {
   document.getElementById('pipelineSection').style.display = 'none';
   document.getElementById('resultsSection').style.display = 'block';
   
@@ -179,12 +209,12 @@ function renderResults(result) {
   grid.innerHTML = '';
   
   clips.forEach((clip, index) => {
-    const card = createClipCard(clip, index, result.job_id);
+    const card = createClipCard(clip, index, result.job_id, demo);
     grid.appendChild(card);
   });
 }
 
-function createClipCard(clip, index, jobId) {
+function createClipCard(clip, index, jobId, demo) {
   const card = document.createElement('div');
   card.className = 'clip-card';
   card.style.animationDelay = `${index * 0.1}s`;
@@ -204,10 +234,20 @@ function createClipCard(clip, index, jobId) {
   scoreBadge.innerHTML = `⭐ ${clip.consensus_score || 0}`;
   thumbWrapper.appendChild(scoreBadge);
   
-  if (clip.thumbnail) {
+  // Agreement badge
+  if (clip.agreement && clip.agreement >= 4) {
+    const agreeBadge = document.createElement('div');
+    agreeBadge.className = 'clip-agreement-badge';
+    agreeBadge.innerHTML = `✓ ${clip.agreement}/5 agents agree`;
+    thumbWrapper.appendChild(agreeBadge);
+  }
+  
+  // Thumbnail image
+  const thumbSrc = demo ? clip.thumbnail_data : `${API_BASE}/api/job/${jobId}/thumbnails/${(clip.thumbnail || '').replace('thumbnails/', '')}`;
+  if (thumbSrc) {
     const img = document.createElement('img');
     img.className = 'clip-thumb';
-    img.src = `${API_BASE}/api/job/${jobId}/thumbnails/${clip.thumbnail.replace('thumbnails/', '')}`;
+    img.src = thumbSrc;
     img.alt = 'Clip thumbnail';
     thumbWrapper.appendChild(img);
   } else {
@@ -279,31 +319,50 @@ function createClipCard(clip, index, jobId) {
   const actions = document.createElement('div');
   actions.className = 'clip-actions';
   
-  if (clip.clip_path) {
-    const dlBtn = document.createElement('a');
-    dlBtn.className = 'btn-download';
-    dlBtn.href = `${API_BASE}/api/job/${jobId}/clips/${clip.clip_path.replace('clips/', '')}`;
-    dlBtn.download = `clip_${index + 1}.mp4`;
-    dlBtn.innerHTML = '⬇ Clip (16:9)';
-    actions.appendChild(dlBtn);
-  }
-  
-  if (clip.vertical_path) {
-    const vertBtn = document.createElement('a');
-    vertBtn.className = 'btn-download';
-    vertBtn.href = `${API_BASE}/api/job/${jobId}/clips/${clip.vertical_path.replace('clips/', '')}`;
-    vertBtn.download = `clip_${index + 1}_vertical.mp4`;
-    vertBtn.innerHTML = '📱 Vertical (9:16)';
-    actions.appendChild(vertBtn);
-  }
-  
-  if (clip.thumbnail) {
-    const thumbBtn = document.createElement('a');
-    thumbBtn.className = 'btn-download';
-    thumbBtn.href = `${API_BASE}/api/job/${jobId}/thumbnails/${clip.thumbnail.replace('thumbnails/', '')}`;
-    thumbBtn.download = `clip_${index + 1}_thumb.jpg`;
-    thumbBtn.innerHTML = '🖼 Thumbnail';
-    actions.appendChild(thumbBtn);
+  if (!demo) {
+    // Real upload — show download buttons
+    if (clip.clip_path) {
+      const dlBtn = document.createElement('a');
+      dlBtn.className = 'btn-download';
+      dlBtn.href = `${API_BASE}/api/job/${jobId}/clips/${clip.clip_path.replace('clips/', '')}`;
+      dlBtn.download = `clip_${index + 1}.mp4`;
+      dlBtn.innerHTML = '⬇ Clip (16:9)';
+      actions.appendChild(dlBtn);
+    }
+    
+    if (clip.vertical_path) {
+      const vertBtn = document.createElement('a');
+      vertBtn.className = 'btn-download';
+      vertBtn.href = `${API_BASE}/api/job/${jobId}/clips/${clip.vertical_path.replace('clips/', '')}`;
+      vertBtn.download = `clip_${index + 1}_vertical.mp4`;
+      vertBtn.innerHTML = '📱 Vertical (9:16)';
+      actions.appendChild(vertBtn);
+    }
+    
+    if (clip.thumbnail) {
+      const thumbBtn = document.createElement('a');
+      thumbBtn.className = 'btn-download';
+      thumbBtn.href = `${API_BASE}/api/job/${jobId}/thumbnails/${clip.thumbnail.replace('thumbnails/', '')}`;
+      thumbBtn.download = `clip_${index + 1}_thumb.jpg`;
+      thumbBtn.innerHTML = '🖼 Thumbnail';
+      actions.appendChild(thumbBtn);
+    }
+  } else {
+    // Demo mode — show thumbnail download only (data URL)
+    if (clip.thumbnail_data) {
+      const thumbBtn = document.createElement('a');
+      thumbBtn.className = 'btn-download';
+      thumbBtn.href = clip.thumbnail_data;
+      thumbBtn.download = `clip_${index + 1}_thumb.jpg`;
+      thumbBtn.innerHTML = '🖼 Thumbnail';
+      actions.appendChild(thumbBtn);
+    }
+    
+    // Info note for demo
+    const info = document.createElement('div');
+    info.className = 'demo-info';
+    info.innerHTML = '💡 Upload a real video to get downloadable clips with captions';
+    actions.appendChild(info);
   }
   
   card.appendChild(actions);
