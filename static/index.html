@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Viral Clip Agent — Multi-Agent Video Clip Discovery</title>
+<link rel="preconnect" href="https://api.fontshare.com" />
+<link href="https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@400,500,700,800&f[]=satoshi@300,400,500,700&f[]=jetbrains-mono@400,500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect x='3' y='6' width='18' height='12' rx='2' fill='%231a1916' stroke='%23f5a623' stroke-width='2'/><circle cx='12' cy='12' r='3' fill='%23f5a623'/></svg>" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 32 32" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="4" y="8" width="24" height="16" rx="2" />
+        <circle cx="16" cy="16" r="4" />
+        <circle cx="16" cy="16" r="1.5" fill="currentColor" />
+        <line x1="8" y1="4" x2="8" y2="8" />
+        <line x1="24" y1="4" x2="24" y2="8" />
+      </svg>
+      <div>
+        <div class="brand-name">Viral Clip Agent</div>
+        <div class="brand-sub">Multi-Agent Clip Discovery Pipeline</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="status-badge" id="statusBadge" style="display:none;">
+        <span class="status-dot"></span>
+        <span id="statusText">Idle</span>
+      </div>
+      <button class="theme-toggle" data-theme-toggle aria-label="Toggle theme">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+
+  <!-- Hero / Upload Section -->
+  <section class="hero" id="heroSection">
+    <h1 class="hero-title">Five agents watch your video.<br>Each one finds clips differently.</h1>
+    <p class="hero-desc">
+      A multi-agent pipeline that analyzes long-form video and identifies clips with viral potential.
+      Five AI "viewer" agents each score segments from their own perspective — hook strength, emotional
+      intensity, quotability, narrative structure, and trend potential. Clips that multiple agents agree
+      on rise to the top. Then the Edit Agent trims and captions them, and the Packaging Agent generates
+      titles, thumbnails, and descriptions.
+    </p>
+
+    <!-- Agent roster -->
+    <div class="agent-roster" id="agentRoster">
+      <div class="agent-chip"><span class="agent-icon">🎯</span> Hook Hunter</div>
+      <div class="agent-chip"><span class="agent-icon">🔥</span> Emotion Reader</div>
+      <div class="agent-chip"><span class="agent-icon">💎</span> Quote Finder</div>
+      <div class="agent-chip"><span class="agent-icon">📖</span> Story Analyst</div>
+      <div class="agent-chip"><span class="agent-icon">📈</span> Trend Spotter</div>
+    </div>
+
+    <!-- Upload area -->
+    <div class="upload-zone" id="uploadZone">
+      <div class="upload-inner">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="17 8 12 3 7 8" />
+          <line x1="12" y1="3" x2="12" y2="15" />
+        </svg>
+        <div class="upload-text">
+          <strong>Drop a video here</strong> or click to browse
+          <div class="upload-hint">MP4, MOV, MKV, MP3, WAV — up to 500MB</div>
+        </div>
+        <input type="file" id="fileInput" accept="video/*,audio/*" style="display:none;" />
+      </div>
+    </div>
+
+    <div class="demo-section">
+      <button class="btn-demo" id="demoBtn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        Run Demo with Sample Podcast
+      </button>
+    </div>
+  </section>
+
+  <!-- Pipeline Visualization -->
+  <section class="pipeline-section" id="pipelineSection" style="display:none;">
+    <h2 class="section-heading">Pipeline</h2>
+    <div class="pipeline-stages" id="pipelineStages">
+      <div class="stage-card" data-stage="ingest">
+        <div class="stage-icon">📥</div>
+        <div class="stage-name">Ingest</div>
+        <div class="stage-status">Waiting</div>
+      </div>
+      <div class="stage-arrow">→</div>
+      <div class="stage-card" data-stage="transcription">
+        <div class="stage-icon">📝</div>
+        <div class="stage-name">Transcribe</div>
+        <div class="stage-status">Waiting</div>
+      </div>
+      <div class="stage-arrow">→</div>
+      <div class="stage-card" data-stage="scout">
+        <div class="stage-icon">🔍</div>
+        <div class="stage-name">Clip Scout</div>
+        <div class="stage-status">Waiting</div>
+      </div>
+      <div class="stage-arrow">→</div>
+      <div class="stage-card" data-stage="edit">
+        <div class="stage-icon">✂️</div>
+        <div class="stage-name">Edit Agent</div>
+        <div class="stage-status">Waiting</div>
+      </div>
+      <div class="stage-arrow">→</div>
+      <div class="stage-card" data-stage="packaging">
+        <div class="stage-icon">📦</div>
+        <div class="stage-name">Packaging</div>
+        <div class="stage-status">Waiting</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Results -->
+  <section class="results-section" id="resultsSection" style="display:none;">
+    <h2 class="section-heading">Ranked Clips <span class="result-count" id="resultCount"></span></h2>
+    <div class="clips-grid" id="clipsGrid">
+      <!-- Clip cards filled by JS -->
+    </div>
+  </section>
+
+</main>
+
+<footer class="app-footer">
+  <div class="footer-inner">
+    <span>Viral Clip Agent — Multi-Agent Pipeline</span>
+    <span class="footer-disclaimer">Built by Daniel Paxson</span>
+  </div>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
